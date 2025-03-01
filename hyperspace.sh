@@ -1,3 +1,18 @@
+#!/bin/bash
+echo "Обновляем систему перед настройкой..."
+sudo apt update -y && sudo apt upgrade -y
+
+# Проверка наличия необходимых утилит, установка если отсутствуют
+if ! command -v figlet &> /dev/null; then
+    echo "figlet не найден. Устанавливаем..."
+    sudo apt update && sudo apt install -y figlet
+fi
+
+if ! command -v whiptail &> /dev/null; then
+    echo "whiptail не найден. Устанавливаем..."
+    sudo apt update && sudo apt install -y whiptail
+fi
+
 # Определяем цвета для удобства
 YELLOW="\e[33m"
 CYAN="\e[36m"
@@ -7,6 +22,10 @@ RED="\e[31m"
 PINK="\e[35m"
 NC="\e[0m"
 
+install_dependencies() {
+    echo -e "${GREEN}Устанавливаем необходимые пакеты...${NC}"
+    sudo apt update && sudo apt install -y curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip screen
+}
 
 # Вывод приветственного текста с помощью figlet
 echo -e "${RED}$(figlet -w 150 -f standard "SenseiCryptoX")${NC}"
@@ -40,7 +59,7 @@ echo ""
 
 # Функция для установки ноды
 install_node() {
-    echo 'Начинаю установку...'
+  echo 'Начинаю установку...'
 
   read -p "Введите ваш приватный ключ: " PRIVATE_KEY
   echo $PRIVATE_KEY > $HOME/my.pem
@@ -114,12 +133,11 @@ install_node() {
 }
 
 # Функция для проверки поинтов ноды
-check_points() {
-      aios-cli hive points
+  aios-cli hive points
 }
 # Функция для рестарта
 restart_node() {
-    session="hyperspacenode"
+  session="hyperspacenode"
   
   if screen -list | grep -q "\.${session}"; then
     screen -S "${session}" -p 0 -X stuff "^C"
@@ -132,8 +150,7 @@ restart_node() {
 }
 
 # Функция для удаления ноды
-remove_node() {
-    read -p 'Если уверены удалить ноду, введите любую букву (CTRL+C чтобы выйти): ' checkjust
+  read -p 'Если уверены удалить ноду, введите любую букву (CTRL+C чтобы выйти): ' checkjust
 
   echo 'Начинаю удалять ноду...'
 
@@ -143,10 +160,6 @@ remove_node() {
   sudo rm -rf $HOME/.aios
 
   echo 'Нода была удалена.'
-}
-
-exit_from_script() {
-  exit 0
 }
 
 # Основное меню
