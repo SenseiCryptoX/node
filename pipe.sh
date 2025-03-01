@@ -59,112 +59,107 @@ echo ""
 
 # Функция для установки ноды
 install_node() {
-    echo -e "${BLUE}Начинаем установку ноды...${NC}"
+  echo 'Начинаю установку...'
 
-    # Обновление и установка зависимостей
-    install_dependencies
+  read -p "Введите ваш приватный ключ: " PRIVATE_KEY
+  echo $PRIVATE_KEY > $HOME/my.pem
 
-    # Создание директории для кэша и переход в неё
-    mkdir -p ~/pipe/download_cache
-    cd ~/pipe
+  session="hyperspacenode"
 
-    # Скачиваем файл pop
-    wget https://dl.pipecdn.app/v0.2.8/pop
+  cd $HOME
 
-    # Делаем файл исполнимым
-    chmod +x pop
+  sudo apt-get update -y && sudo apt-get upgrade -y
+  sudo apt-get install wget make tar screen nano libssl3-dev build-essential unzip lz4 gcc git jq -y
 
-    # Создание новой сессии в screen
-    screen -S pipe2 -dm
+  if [ -d "$HOME/.aios" ]; then
+    sudo rm -rf "$HOME/.aios"
+    aios-cli kill
+  fi
+  
+  if screen -list | grep -q "\.${session}"; then
+    screen -S hyperspacenode -X quit
+  else
+    echo "Сессия ${session} не найдена."
+  fi
 
-    echo -e "${YELLOW}Введите ваш публичный адрес Solana:${NC}"
-    read SOLANA_PUB_KEY
-    
-    # Запрос значения для RAM
-    echo -e "${YELLOW}Введите количество RAM в ГБ (целое число):${NC}"
-    read RAM
-    
-    # Запрос значения для max-disk
-    echo -e "${YELLOW}Введите количество max-disk в ГБ (целое число):${NC}"
-    read DISK
-    
-    # Запуск команды с параметрами, с указанием публичного ключа Solana, RAM и max-disk
-    screen -S pipe2 -X stuff "./pop --ram $RAM --max-disk $DISK --cache-dir ~/pipe/download_cache --pubKey $SOLANA_PUB_KEY\n"
-    sleep 3
-    screen -S pipe2 -X stuff "e4313e9d866ee3df\n"
+  while true; do
+    curl -s https://download.hyper.space/api/install | bash | tee $HOME/hyperspacenode_install.log
 
-    echo -e "${GREEN}Процесс установки и запуска завершён!${NC}"
+    if ! grep -q "Failed to parse version from release data." $HOME/hyperspacenode_install.log; then
+        echo "Клиент-скрипт был установлен."
+        break
+    else
+        echo "Сервер установки клиента недоступен, повторим через 30 секунд..."
+        sleep 30
+    fi
+  done
+
+  rm hyperspacenode_install.log
+
+  export PATH=$PATH:$HOME/.aios
+  source ~/.bashrc
+
+  eval "$(cat ~/.bashrc | tail -n +10)"
+
+  screen -dmS hyperspacenode bash -c '
+    echo "Начало выполнения скрипта в screen-сессии"
+
+    aios-cli start
+
+    exec bash
+  '
+
+  while true; do
+    aios-cli models add hf:TheBloke/phi-2-GGUF:phi-2.Q4_K_M.gguf 2>&1 | tee $HOME/hyperspacemodel_download.log
+
+    if grep -q "Download complete" $HOME/hyperspacemodel_download.log; then
+        echo "Модель была установлен."
+        break
+    else
+        echo "Сервер установки модели недоступен, повторим через 30 секунд..."
+        sleep 30
+    fi
+  done
+
+  rm hyperspacemodel_download.log
+
+  aios-cli hive import-keys $HOME/my.pem
+  aios-cli hive login
+  aios-cli hive connect
 }
 
 # Функция для проверки статуса ноды
-check_status() {
-    echo -e "${BLUE}Проверка статуса ноды...${NC}"
-    
-    cd pipe
-    ./pop --status
-    cd ..
+  screen -S hyperspacenode -X hardcopy /tmp/screen_log.txt && sleep 0.1 && tail -n 100 /tmp/screen_log.txt && rm /tmp/screen_log.txt
 }
 
 # Функция для проверки поинтов ноды
-check_points() {
-    echo -e "${BLUE}Проверка поинтов ноды...${NC}"
-
-    cd pipe
-    
-    ./pop --points
-    
-    cd ..
+  aios-cli hive points
 }
-# Функция для обновлення
-update_node() {
-    echo -e "${BLUE}Обновление до версии 0.2.8...${NC}"
-
-    # Остановка процесса pop
-    echo -e "${YELLOW}Останавливаем службу pipe-pop...${NC}"
-    ps aux | grep '[p]op' | awk '{print $2}' | xargs kill
-
-    # Переход в директорию pipe
-    cd ~/pipe
-
-    # Удаление старой версии pop
-    echo -e "${YELLOW}Удаляем старую версию pop...${NC}"
-    rm -f pop
-
-    # Скачивание новой версии pop
-    echo -e "${YELLOW}Скачиваем новую версию pop...${NC}"
-    wget -O pop "https://dl.pipecdn.app/v0.2.8/pop"
-
-    # Делаем файл исполнимым
-    chmod +x pop
-
-    # Перезагрузка системных служб
-    sudo systemctl daemon-reload
-
-    # Завершаем сессию screen с именем 'pipe2', если она существует
-    screen -S pipe2 -X quit
-    sleep 2
-
-    # Перезапуск сессии screen с именем 'pipe2' и запуск pop
-    screen -S pipe2 -dm ./pop
-    sleep 3
-    screen -S pipe2 -X stuff "y\n"
-
-    echo -e "${GREEN}Обновление завершено!${NC}"
+# Функция для рестарта
+restart_node() {
+  session="hyperspacenode"
+  
+  if screen -list | grep -q "\.${session}"; then
+    screen -S "${session}" -p 0 -X stuff "^C"
+    sleep 1
+    screen -S "${session}" -p 0 -X stuff "aios-cli start --connect\n"
+    echo "Нода была перезагружена."
+  else
+    echo "Сессия ${session} не найдена."
+  fi
 }
 
 # Функция для удаления ноды
-remove_node() {
-    echo -e "${BLUE}Удаляем ноду...${NC}"
+  read -p 'Если уверены удалить ноду, введите любую букву (CTRL+C чтобы выйти): ' checkjust
 
-     pkill -f pop
+  echo 'Начинаю удалять ноду...'
 
-    # Завершаем сеанс screen с именем 'pipe2' и удаляем его
-    screen -S pipe2 -X quit
+  screen -S hyperspacenode -X quit
+  aios-cli kill
+  aios-cli models remove hf:TheBloke/phi-2-GGUF:phi-2.Q4_K_M.gguf
+  sudo rm -rf $HOME/.aios
 
-    # Удаление файлов ноды
-    sudo rm -rf ~/pipe
-
-    echo -e "${GREEN}Нода успешно удалена!${NC}"
+  echo 'Нода была удалена.'
 }
 
 # Основное меню
@@ -174,7 +169,7 @@ CHOICE=$(whiptail --title "Меню действий" \
     "2" "Проверка статуса ноды" \
     "3" "Проверка поинтов ноды" \
     "4" "Удаление ноды" \
-    "5" "Обновление ноды" \
+    "5" "Перезагрузить ноду" \
     "6" "Выход" \
     3>&1 1>&2 2>&3)
 
