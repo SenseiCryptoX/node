@@ -187,7 +187,7 @@ case $CHOICE in
         remove_node
         ;;
     5)
-        update_node
+        restart_node
         ;;
     6)
         echo -e "${CYAN}Выход из программы.${NC}"
