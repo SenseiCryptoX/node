@@ -33,7 +33,7 @@ echo -e "${RED}$(figlet -w 150 -f standard "SenseiCryptoX")${NC}"
 echo "===================================================================================================================================="
 echo "Добро пожаловать! Начинаем установку необходимых библиотек, пока подпишись на наш Telegram-канал"
 echo ""
-echo "SenseiCryptoX - https://t.me/SenseiCryptoX$"
+echo "SenseiCryptoX - https://t.me/SenseiCryptoX"
 echo "===================================================================================================================================="
 
 echo ""
@@ -129,10 +129,12 @@ install_node() {
 }
 
 # Функция для проверки статуса ноды
+check_status() {
   screen -S hyperspacenode -X hardcopy /tmp/screen_log.txt && sleep 0.1 && tail -n 100 /tmp/screen_log.txt && rm /tmp/screen_log.txt
 }
 
 # Функция для проверки поинтов ноды
+check_points() {
   aios-cli hive points
 }
 # Функция для рестарта
@@ -150,6 +152,7 @@ restart_node() {
 }
 
 # Функция для удаления ноды
+remove_node() {
   read -p 'Если уверены удалить ноду, введите любую букву (CTRL+C чтобы выйти): ' checkjust
 
   echo 'Начинаю удалять ноду...'
